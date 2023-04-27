@@ -17,7 +17,7 @@ func TestWorkerPool_RunJob_Success(t *testing.T) {
 		}
 
 		wp.Wait()
-		assert.Equal(t, numberOfExec, int(wp.NumOfExecutions))
+		assert.Equal(t, numberOfExec, int(wp.NumOfExecutions()))
 	})
 }
 
@@ -37,6 +37,6 @@ func TestWorkerPool_RunJob_Error(t *testing.T) {
 		}
 
 		wp.Wait()
-		assert.Equal(t, 3, int(wp.NumOfExecutions))
+		assert.Equal(t, 3, int(wp.NumOfExecutions()))
 	})
 }

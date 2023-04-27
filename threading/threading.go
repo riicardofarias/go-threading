@@ -9,7 +9,7 @@ import (
 // WorkerPool is a pool of workers.
 // It is used to run jobs in parallel.
 type WorkerPool struct {
-	NumOfExecutions int32
+	numOfExecutions int32
 
 	workersCount chan int
 	wg           *sync.WaitGroup
@@ -24,12 +24,11 @@ func NewWorkerPool(workersCount int) *WorkerPool {
 
 	// Create a new worker pool.
 	w := &WorkerPool{
-		NumOfExecutions: int32(0),
-
-		workersCount: make(chan int, workersCount),
-		wg:           &sync.WaitGroup{},
-		ctx:          ctx,
-		cancel:       cancel,
+		numOfExecutions: int32(0),
+		workersCount:    make(chan int, workersCount),
+		wg:              &sync.WaitGroup{},
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 
 	// Fill the workersCount channel with the number of workers.
@@ -38,6 +37,12 @@ func NewWorkerPool(workersCount int) *WorkerPool {
 	}
 
 	return w
+}
+
+// NumOfExecutions returns the number of jobs that have been executed.
+// It is a thread-safe function.
+func (w *WorkerPool) NumOfExecutions() int32 {
+	return atomic.LoadInt32(&w.numOfExecutions)
 }
 
 // RunJob runs the given job in a worker.
@@ -61,7 +66,7 @@ func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
 			}
 		}
 
-		atomic.AddInt32(&w.NumOfExecutions, 1)
+		atomic.AddInt32(&w.numOfExecutions, 1)
 	}()
 }
 
