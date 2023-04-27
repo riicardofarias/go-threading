@@ -12,7 +12,7 @@ const (
 )
 
 func main() {
-	workerPool := threading.NewWorkerPool(150)
+	workerPool := threading.NewWorkerPool(1)
 
 	data := make([]int, dataCount)
 	chunkSize := 1500
@@ -52,11 +52,11 @@ func main() {
 func Worker(id int) error {
 	fmt.Println(fmt.Sprintf("Worker %d started", id))
 
-	if id == 100 {
+	if id == 10 {
 		return errors.New("error")
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	return nil
 }

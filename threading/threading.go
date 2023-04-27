@@ -6,56 +6,68 @@ import (
 	"sync/atomic"
 )
 
+// WorkerPool is a pool of workers.
+// It is used to run jobs in parallel.
 type WorkerPool struct {
-	WorkersNumber   chan int
-	WorkerGroup     sync.WaitGroup
 	NumOfExecutions int32
 
-	ctx    context.Context
-	cancel func()
+	workersCount chan int
+	wg           *sync.WaitGroup
+	ctx          context.Context
+	cancel       func()
 }
 
-func NewWorkerPool(workersNumber int) *WorkerPool {
+// NewWorkerPool creates a new worker pool with the given number of workers.
+// The workersCount argument is the number of workers that can run in parallel.
+func NewWorkerPool(workersCount int) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Create a new worker pool.
 	w := &WorkerPool{
-		WorkersNumber: make(chan int, workersNumber),
-		WorkerGroup:   sync.WaitGroup{},
+		NumOfExecutions: int32(0),
 
-		ctx:    ctx,
-		cancel: cancel,
+		workersCount: make(chan int, workersCount),
+		wg:           &sync.WaitGroup{},
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
-	for i := 0; i < workersNumber; i++ {
-		w.WorkersNumber <- 1
+	// Fill the workersCount channel with the number of workers.
+	for i := 0; i < workersCount; i++ {
+		w.workersCount <- 1
 	}
 
 	return w
 }
 
-func (w *WorkerPool) RunJob(id int, job func(num int) error) {
-	num := <-w.WorkersNumber
+// RunJob runs the given job in a worker.
+// The jobFn is a function that takes an integer as an argument and returns an error.
+// The integer is the id of the worker.
+// If the jobFn returns an error, the worker pool is stopped.
+func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
+	w.wg.Add(<-w.workersCount)
 
-	w.WorkerGroup.Add(num)
-
-	go func(ctx context.Context) {
-		defer w.WorkerGroup.Done()
-		defer func() { w.WorkersNumber <- 1 }()
+	// Run the jobFn in a goroutine.
+	go func() {
+		defer w.wg.Done()
+		defer func() { w.workersCount <- 1 }()
 
 		select {
 		case <-w.ctx.Done():
 			return
 		default:
-			if err := job(id); err != nil {
+			if err := jobFn(id); err != nil {
 				w.cancel()
 			}
 		}
 
 		atomic.AddInt32(&w.NumOfExecutions, 1)
-	}(w.ctx)
+	}()
 }
 
+// Wait waits for all the workers to finish.
+// It is a blocking function and it should be called after all the jobs have been added to the worker pool.
 func (w *WorkerPool) Wait() {
-	defer close(w.WorkersNumber)
-	w.WorkerGroup.Wait()
+	defer close(w.workersCount)
+	w.wg.Wait()
 }
