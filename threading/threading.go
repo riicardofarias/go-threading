@@ -10,6 +10,7 @@ import (
 // It is used to run jobs in parallel.
 type WorkerPool struct {
 	numOfExecutions int32
+	numOfFailures   int32
 
 	workersCount chan int
 	wg           *sync.WaitGroup
@@ -25,6 +26,7 @@ func NewWorkerPool(workersCount int) *WorkerPool {
 	// Create a new worker pool.
 	w := &WorkerPool{
 		numOfExecutions: int32(0),
+		numOfFailures:   int32(0),
 		workersCount:    make(chan int, workersCount),
 		wg:              &sync.WaitGroup{},
 		ctx:             ctx,
@@ -45,6 +47,12 @@ func (w *WorkerPool) NumOfExecutions() int32 {
 	return atomic.LoadInt32(&w.numOfExecutions)
 }
 
+// NumOfFailures returns the number of jobs that have failed.
+// It is a thread-safe function.
+func (w *WorkerPool) NumOfFailures() int32 {
+	return atomic.LoadInt32(&w.numOfFailures)
+}
+
 // RunJob runs the given job in a worker.
 // The jobFn is a function that takes an integer as an argument and returns an error.
 // The integer is the id of the worker.
@@ -63,6 +71,7 @@ func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
 		default:
 			if err := jobFn(id); err != nil {
 				w.cancel()
+				atomic.AddInt32(&w.numOfFailures, 1)
 			}
 		}
 
