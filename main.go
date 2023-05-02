@@ -25,13 +25,15 @@ func main() {
 
 	fmt.Println(fmt.Sprintf("Number of executions: %d", workerPool.NumOfExecutions()))
 	fmt.Println(fmt.Sprintf("Number of failures: %d", workerPool.NumOfFailures()))
+
+	fmt.Println(fmt.Sprintf("Job error: %v", workerPool.Error()))
 }
 
 func Worker(id int) error {
 	fmt.Println(fmt.Sprintf("Worker %d started", id))
 
 	if id == 100 || id == 101 {
-		return errors.New("error")
+		return errors.New("error in worker: " + fmt.Sprintf("%d", id))
 	}
 
 	time.Sleep(500 * time.Millisecond)

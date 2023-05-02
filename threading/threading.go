@@ -12,6 +12,7 @@ type WorkerPool struct {
 	numOfExecutions int32
 	numOfFailures   int32
 
+	jobError     error
 	workersCount chan int
 	wg           *sync.WaitGroup
 	ctx          context.Context
@@ -53,6 +54,12 @@ func (w *WorkerPool) NumOfFailures() int32 {
 	return atomic.LoadInt32(&w.numOfFailures)
 }
 
+// Error returns the error of the job that failed.
+// It is a thread-safe function.
+func (w *WorkerPool) Error() error {
+	return w.jobError
+}
+
 // RunJob runs the given job in a worker.
 // The jobFn is a function that takes an integer as an argument and returns an error.
 // The integer is the id of the worker.
@@ -72,6 +79,7 @@ func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
 			if err := jobFn(id); err != nil {
 				w.cancel()
 				atomic.AddInt32(&w.numOfFailures, 1)
+				w.jobError = err
 			}
 		}
 
