@@ -6,9 +6,7 @@ import (
 	"sync/atomic"
 )
 
-// WorkerPool is a pool of workers.
-// It is used to run jobs in parallel.
-type WorkerPool struct {
+type WorkerPool[T any] struct {
 	numOfExecutions int32
 	numOfFailures   int32
 
@@ -19,10 +17,13 @@ type WorkerPool struct {
 	cancel       func()
 }
 
-// NewWorkerPool creates a new worker pool with the given number of workers.
-// The workersCount argument is the number of workers that can run in parallel.
-func NewWorkerPool(workersCount int) *WorkerPool {
+func NewWorkerPool[T any](workersCount int) *WorkerPool[T] {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// If the workersCount is less than or equal to zero, set it to 1.
+	if workersCount <= 0 {
+		workersCount = 1
+	}
 
 	// Create a new worker pool.
 	w := &WorkerPool{
@@ -39,24 +40,18 @@ func NewWorkerPool(workersCount int) *WorkerPool {
 		w.workersCount <- 1
 	}
 
-	return w
+	return (*WorkerPool[T])(w)
 }
 
-// NumOfExecutions returns the number of jobs that have been executed.
-// It is a thread-safe function.
-func (w *WorkerPool) NumOfExecutions() int32 {
+func (w *WorkerPool[T]) NumOfExecutions() int32 {
 	return atomic.LoadInt32(&w.numOfExecutions)
 }
 
-// NumOfFailures returns the number of jobs that have failed.
-// It is a thread-safe function.
-func (w *WorkerPool) NumOfFailures() int32 {
+func (w *WorkerPool[T]) NumOfFailures() int32 {
 	return atomic.LoadInt32(&w.numOfFailures)
 }
 
-// Error returns the error of the job that failed.
-// It is a thread-safe function.
-func (w *WorkerPool) Error() error {
+func (w *WorkerPool[T]) Error() error {
 	return w.jobError
 }
 
@@ -64,7 +59,7 @@ func (w *WorkerPool) Error() error {
 // The jobFn is a function that takes an integer as an argument and returns an error.
 // The integer is the id of the worker.
 // If the jobFn returns an error, the worker pool is stopped.
-func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
+func (w *WorkerPool[T]) RunJob(dataset T, jobFn func(_dataset T) error) {
 	w.wg.Add(<-w.workersCount)
 
 	// Run the jobFn in a goroutine.
@@ -76,7 +71,7 @@ func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
 		case <-w.ctx.Done():
 			return
 		default:
-			if err := jobFn(id); err != nil {
+			if err := jobFn(dataset); err != nil {
 				w.cancel()
 				atomic.AddInt32(&w.numOfFailures, 1)
 				w.jobError = err
@@ -88,8 +83,8 @@ func (w *WorkerPool) RunJob(id int, jobFn func(num int) error) {
 }
 
 // Wait waits for all the workers to finish.
-// It is a blocking function and it should be called after all the jobs have been added to the worker pool.
-func (w *WorkerPool) Wait() {
+// It is a blocking function. It should be called after all the jobs have been added to the worker pool.
+func (w *WorkerPool[T]) Wait() {
 	defer close(w.workersCount)
 	w.wg.Wait()
 }
